@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WCAG 2.1 AA Scanner</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; line-height: 1.5; }
+    input { width: 400px; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 6px; }
+    button { padding: 12px 24px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #loading { display: none; margin: 20px 0; font-size: 18px; color: #007bff; }
+    #error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px; margin: 20px 0; }
+    #results { margin-top: 30px; }
+    .no-issues { color: #28a745; font-size: 24px; text-align: center; }
+    .issue { border: 1px solid #dee2e6; border-radius: 8px; margin: 20px 0; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .critical { border-left: 5px solid #dc3545; background: #f8d7da; }
+    .serious { border-left: 5px solid #fd7e14; background: #fff3cd; }
+    .moderate { border-left: 5px solid #ffc107; background: #fff3cd; }
+    .minor { border-left: 5px solid #28a745; background: #d1ecf1; }
+    .issue h3 { margin: 0 0 10px 0; font-size: 18px; }
+    .nodes { background: rgba(0,0,0,0.05); padding: 15px; border-radius: 4px; margin-top: 15px; }
+    .nodes ul { margin: 10px 0; padding-left: 20px; }
+    .nodes li { margin: 5px 0; font-family: monospace; font-size: 14px; }
+    a { color: #007bff; }
+  </style>
+</head>
+<body>
+  <h1>🔍 WCAG 2.1 AA Accessibility Scanner</h1>
+  <p>Enter any public URL below. It scans for WCAG 2.1 Level AA violations using axe-core.</p>
+  <div>
+    <input type="url" id="url" placeholder="https://example.com" required>
+    <button onclick="scan()">🚀 Scan Website</button>
+  </div>
+  <div id="loading">⏳ Scanning... (this may take 10-30 seconds)</div>
+  <div id="error"></div>
+  <div id="results"></div>
+
+  <script>
+    async function scan() {
+      const urlEl = document.getElementById('url');
+      const url = urlEl.value.trim();
+      if (!url) {
+        alert('Please enter a valid URL');
+        return;
+      }
+      urlEl.value = url;
+
+      const loading = document.getElementById('loading');
+      const results = document.getElementById('results');
+      const errorEl = document.getElementById('error');
+      const btn = document.querySelector('button');
+
+      loading.style.display = 'block';
+      results.innerHTML = '';
+      errorEl.innerHTML = '';
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+
+      try {
+        const res = await fetch('/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = '🚀 Scan Website';
+
+        if (res.ok) {
+          displayResults(data.violations || []);
+        } else {
+          errorEl.innerHTML = `<strong>Error:</strong> ${data.error || 'Unknown error'}`;
+        }
+      } catch (err) {
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = '🚀 Scan Website';
+        errorEl.innerHTML = `<strong>Error:</strong> ${err.message}`;
+      }
+    }
+
+    function displayResults(violations) {
+      const container = document.getElementById('results');
+      if (violations.length === 0) {
+        container.innerHTML = '<div class="no-issues">🎉 No WCAG 2.1 AA violations detected! <br><small>This page likely passes Level AA.</small></div>';
+        return;
+      }
+
+      let html = `<h2>📊 Found ${violations.length} WCAG 2.1 AA violation(s)</h2>`;
+      violations.forEach((issue) => {
+        const impactClass = issue.impact || 'minor';
+        html += `
+          <div class="issue ${impactClass}">
+            <h3>${issue.id} — ${issue.description}</h3>
+            <p><strong>Impact:</strong> ${issue.impact.toUpperCase()}</p>
+            ${issue.help ? `<p>${issue.help}</p>` : ''}
+            ${issue.helpUrl ? `<p><a href="${issue.helpUrl}" target="_blank" rel="noopener">📖 How to fix (axe-core guide)</a></p>` : ''}
+            <div class="nodes">
+              <strong>Affected elements (${issue.nodes.length}):</strong>
+              <ul>${issue.nodes.slice(0, 10).map(node => `<li><strong>${node.target}</strong><br><code>${(node.html || '').substring(0, 100)}${(node.html || '').length > 100 ? '...' : ''}</code></li>`).join('')}</ul>
+              ${issue.nodes.length > 10 ? '<p><em>(Showing first 10; full report in console)</em></p>' : ''}
+            </div>
+          </div>`;
+      });
+      container.innerHTML = html;
+      console.log('Full violations:', violations); // Debug
+    }
+
+    // Enter key support
+    document.getElementById('url').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') scan();
+    });
+  </script>
+</body>
+</html>
